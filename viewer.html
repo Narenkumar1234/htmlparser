@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HTML Viewer</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="viewer-page">
+  <main class="container">
+    <section id="splitRoot" class="split-layout">
+      <section id="editorPanel" class="panel editor-panel">
+        <div class="panel-head">
+          <h2>HTML Input</h2>
+          <button id="resizeToEndBtn" type="button" class="ghost-btn">Resize to End</button>
+        </div>
+        <textarea id="htmlInput" placeholder="<h1>Hello</h1>"></textarea>
+      </section>
+
+      <div id="divider" class="divider" role="separator" aria-label="Resize panels"></div>
+
+      <section class="panel preview-panel">
+        <div class="panel-head">
+          <h2>Preview</h2>
+          <div class="preview-actions">
+            <button id="fullPreviewBtn" type="button" class="primary-btn">Full Preview</button>
+            <button id="showEditorBtn" type="button" class="ghost-btn hidden">Show Editor</button>
+          </div>
+        </div>
+        <iframe id="previewFrame" title="HTML preview"></iframe>
+      </section>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <a href="https://buymeacoffee.com/narenkumar" target="_blank" rel="noopener noreferrer">Buy me a coffee</a>
+    <span id="copyrightText"></span>
+  </footer>
+
+  <script src="viewer.js"></script>
+</body>
+</html>
