@@ -11,15 +11,24 @@ window.addEventListener("message", (event) => {
   if (event.source !== window.parent) {
     return;
   }
-  if (!event.data || event.data.type !== "render-html") {
+  if (!event.data) {
     return;
   }
   if (!sessionToken || event.data.token !== sessionToken) {
     return;
   }
 
-  latestHtml = typeof event.data.html === "string" ? event.data.html : "";
-  renderToFrame();
+  if (event.data.type === "render-html") {
+    latestHtml = typeof event.data.html === "string" ? event.data.html : "";
+    renderToFrame();
+  } else if (event.data.type === "scroll-to-percent") {
+    if (runtimeFrame && runtimeFrame.contentWindow) {
+      runtimeFrame.contentWindow.postMessage(
+        { type: "scroll-to-percent", percent: event.data.percent },
+        "*"
+      );
+    }
+  }
 });
 
 window.parent.postMessage({ type: "sandbox-ready", token: sessionToken }, "*");

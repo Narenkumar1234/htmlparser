@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>HTML Viewer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lexend+Deca:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="viewer-page">
@@ -11,10 +14,19 @@
     <section id="splitRoot" class="split-layout">
       <section id="editorPanel" class="panel editor-panel">
         <div class="panel-head">
-          <h2>HTML Input</h2>
+          <div class="mode-tabs">
+            <button id="htmlModeBtn" type="button" class="tab-btn active">HTML Editor</button>
+            <button id="mdModeBtn" type="button" class="tab-btn">Markdown Editor</button>
+          </div>
           <button id="resizeToEndBtn" type="button" class="ghost-btn">Resize to End</button>
         </div>
-        <textarea id="htmlInput" placeholder="<h1>Hello</h1>"></textarea>
+        <textarea id="editorInput" placeholder="<h1>Hello</h1>" autocomplete="off" autofocus></textarea>
+        <div class="editor-info-bar">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+          </svg>
+          <span>Tip: You can also drag & drop .html or .md files here!</span>
+        </div>
       </section>
 
       <div id="divider" class="divider" role="separator" aria-label="Resize panels"></div>
@@ -37,6 +49,7 @@
     <span id="copyrightText"></span>
   </footer>
 
+  <script src="marked.min.js"></script>
   <script src="viewer.js"></script>
 </body>
 </html>
