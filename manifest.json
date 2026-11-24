@@ -1,13 +1,25 @@
 {
   "manifest_version": 3,
-  "name": "HTML Viewer",
-  "version": "1.1.0",
-  "description": "Paste HTML or Markdown and instantly preview it.",
+  "name": "HTML Viewer & Markdown Preview – Live HTML, CSS, JS Editor",
+  "short_name": "HTML Viewer",
+  "version": "1.2.0",
+  "description": "Preview HTML, CSS & JavaScript as you type, read and edit Markdown with sync scroll, and open .md files in Chrome. No setup.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "permissions": [
     "storage"
   ],
   "action": {
-    "default_title": "HTML Viewer"
+    "default_title": "HTML Viewer",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
+    }
   },
   "background": {
     "service_worker": "background.js"
@@ -18,7 +30,7 @@
     ]
   },
   "content_security_policy": {
-    "sandbox": "sandbox allow-scripts allow-forms allow-modals allow-downloads; default-src 'self' data: blob: https: http:; script-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; style-src 'self' 'unsafe-inline' data: blob: https: http:; img-src * data: blob:; font-src 'self' data: blob: https: http:; connect-src 'self' data: blob: https: http:; child-src 'self' data: blob:;"
+    "sandbox": "sandbox allow-scripts allow-forms allow-modals allow-downloads; default-src 'self' data: blob: https: http:; script-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:; style-src 'self' 'unsafe-inline' data: blob: https: http:; img-src * data: blob:; font-src 'self' data: blob: https: http:; connect-src 'self' data: blob: https: http:; child-src 'self' data: blob:;"
   },
   "content_scripts": [
     {

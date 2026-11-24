@@ -5,10 +5,10 @@ This document acts as the single source of truth for the HTML Viewer Chrome Web 
 ## Listing Details
 
 ### Extension Name
-`HTML Viewer`
+`HTML Viewer & Markdown Preview – Live HTML, CSS, JS Editor`
 
 ### Summary (132 characters max - matches manifest.json)
-`Paste HTML or Markdown and instantly preview it.`
+`Preview HTML, CSS & JavaScript as you type, read and edit Markdown with sync scroll, and open .md files in Chrome. No setup.`
 
 ### Detailed Description (CWS Store Listing)
 ```text
@@ -46,6 +46,15 @@ The extension declares content scripts matching file and web schemes:
 ---
 
 ## Release History
+
+### Version 1.2.0
+- External stylesheets and scripts referenced by your HTML (e.g. Bootstrap, Tailwind CDN, Google Fonts) now load in the preview, including protocol-relative `//cdn...` URLs.
+- Drop an .html file together with its .css/.js files to preview relative links like `<link href="style.css">`.
+- Previews still run in an isolated sandbox with no access to the extension or your tabs; no new permissions.
+- Renamed to "HTML Viewer & Markdown Preview – Live HTML, CSS, JS Editor" with a clearer store summary.
+- Fixed: dropping a file while the other editor tab is open now loads that file correctly.
+- Fixed a typo in the footer ("All rights reserved").
+- New crisp 16/32/48/128 px icons.
 
 ### Version 1.1.0 (2026-07-21)
 - Added full Markdown (.md) document support.

@@ -31,6 +31,8 @@ let editorMode = "html"; // "html" or "markdown"
 let isDragging = false;
 let previousGridTemplate = "45% 8px 1fr";
 let pendingPreviewHtml = "";
+let companionAssets = new Map(); // lowercased basename -> text, from files dropped together with the main file
+let modeSwitchSeq = 0;
 const previewSessionToken = (globalThis.crypto && crypto.randomUUID)
   ? crypto.randomUUID()
   : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -67,6 +69,70 @@ function isLikelyHtmlDocument(text) {
 
   const tagName = singleTagMatch[1].toLowerCase();
   return KNOWN_HTML_TAGS.has(tagName) || tagName.includes("-");
+}
+
+function getAttr(tag, attrName) {
+  const re = new RegExp(`(?:^|\\s)${attrName}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, "i");
+  const match = tag.match(re);
+  if (!match) return null;
+  return match[1] !== undefined ? match[1] : (match[2] !== undefined ? match[2] : match[3]);
+}
+
+function normalizeProtocolRelativeUrls(html) {
+  if (typeof html !== "string") {
+    return "";
+  }
+  return html
+    .replace(/(\s(?:src|href)\s*=\s*)(["'])\/\//gi, "$1$2https://")
+    .replace(/url\(\s*(["']?)\/\//gi, "url($1https://");
+}
+
+function inlineCompanionAssets(html) {
+  if (typeof html !== "string" || companionAssets.size === 0) {
+    return html;
+  }
+
+  let result = html.replace(/<link\b[^>]*>(?:\s*<\/link>)?/gi, (match) => {
+    const rel = getAttr(match, "rel");
+    if (!rel || !rel.toLowerCase().includes("stylesheet")) {
+      return match;
+    }
+    const href = getAttr(match, "href");
+    if (!href) {
+      return match;
+    }
+    const trimmedHref = href.trim();
+    if (/^(?:https?:|\/\/|data:|blob:)/i.test(trimmedHref)) {
+      return match;
+    }
+    const cleanPath = trimmedHref.split(/[?#]/)[0];
+    const basename = cleanPath.split(/[/\\]/).pop().toLowerCase();
+    if (companionAssets.has(basename)) {
+      const cssText = companionAssets.get(basename);
+      return `<style data-inlined-from="${basename}">${cssText}</style>`;
+    }
+    return match;
+  });
+
+  result = result.replace(/<script\b[^>]*\/>|<script\b[^>]*>[\s\S]*?<\/script>/gi, (match) => {
+    const src = getAttr(match, "src");
+    if (!src) {
+      return match;
+    }
+    const trimmedSrc = src.trim();
+    if (/^(?:https?:|\/\/|data:|blob:)/i.test(trimmedSrc)) {
+      return match;
+    }
+    const cleanPath = trimmedSrc.split(/[?#]/)[0];
+    const basename = cleanPath.split(/[/\\]/).pop().toLowerCase();
+    if (companionAssets.has(basename)) {
+      const jsText = (companionAssets.get(basename) || "").replace(/<\/script/gi, "<\\/script");
+      return `<script data-inlined-from="${basename}">${jsText}</script>`;
+    }
+    return match;
+  });
+
+  return result;
 }
 
 function toRenderableDocument(source, mode) {
@@ -229,10 +295,11 @@ function toRenderableDocument(source, mode) {
 
   // HTML Mode
   if (isLikelyHtmlDocument(trimmed)) {
-    if (raw.includes("</body>")) {
-      return raw.replace("</body>", `${scrollScript}</body>`);
+    let doc = normalizeProtocolRelativeUrls(inlineCompanionAssets(raw));
+    if (doc.includes("</body>")) {
+      return doc.replace("</body>", `${scrollScript}</body>`);
     } else {
-      return raw + scrollScript;
+      return doc + scrollScript;
     }
   }
 
@@ -251,7 +318,7 @@ function sendPreviewToSandbox() {
 
 function setFooterYear() {
   const year = new Date().getFullYear();
-  copyrightText.textContent = `© ${year} All rights received.`;
+  copyrightText.textContent = `© ${year} All rights reserved.`;
 }
 
 function saveState() {
@@ -394,7 +461,8 @@ function updateModeUI(newMode) {
   renderPreview();
 }
 
-function switchMode(newMode) {
+function switchMode(newMode, contentOverride) {
+  const currentSeq = ++modeSwitchSeq;
   if (editorMode === newMode) return;
   
   // Save current before switching
@@ -412,10 +480,23 @@ function switchMode(newMode) {
     localStorage.setItem(STORAGE_MODE_KEY, newMode);
   }
   
-  // Update UI and load content
   const targetKey = newMode === "markdown" ? STORAGE_MD_KEY : STORAGE_HTML_KEY;
+
+  if (typeof contentOverride === "string") {
+    editorInput.value = contentOverride;
+    if (hasChromeStorage) {
+      chrome.storage.local.set({ [targetKey]: contentOverride });
+    } else {
+      localStorage.setItem(targetKey, contentOverride);
+    }
+    updateModeUI(newMode);
+    return;
+  }
+
+  // Update UI and load content
   if (hasChromeStorage) {
     chrome.storage.local.get([targetKey], (result) => {
+      if (currentSeq !== modeSwitchSeq) return;
       editorInput.value = result[targetKey] || "";
       updateModeUI(newMode);
     });
@@ -436,47 +517,70 @@ editorInput.addEventListener("dragleave", () => {
   editorInput.style.borderColor = ""; // reset border
 });
 
-editorInput.addEventListener("drop", (event) => {
+editorInput.addEventListener("drop", async (event) => {
   event.preventDefault();
   editorInput.style.borderColor = "";
-  
-  const file = event.dataTransfer.files[0];
-  if (!file) return;
 
-  const fileName = file.name.toLowerCase();
-  const isMarkdown = fileName.endsWith(".md") || fileName.endsWith(".markdown");
-  const isHtml = fileName.endsWith(".html") || fileName.endsWith(".htm");
+  const files = Array.from(event.dataTransfer.files || []);
+  if (files.length === 0) return;
 
-  if (!isMarkdown && !isHtml) {
-    alert("Unsupported file type! Please drag and drop a .html or .md file.");
+  companionAssets.clear();
+
+  let mainFile = null;
+  const companionFiles = [];
+
+  for (const file of files) {
+    const fileName = file.name.toLowerCase();
+    const isMain = fileName.endsWith(".html") || fileName.endsWith(".htm") || fileName.endsWith(".md") || fileName.endsWith(".markdown");
+    if (isMain && !mainFile) {
+      mainFile = file;
+    } else if (fileName.endsWith(".css") || fileName.endsWith(".js")) {
+      companionFiles.push(file);
+    }
+  }
+
+  if (!mainFile) {
+    alert("Unsupported file type! Please drag and drop a .html or .md file (you can drop its .css/.js files together with it).");
     return;
   }
 
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    const text = e.target.result;
-    
-    if (isMarkdown) {
-      switchMode("markdown");
-      editorInput.value = text;
-      if (hasChromeStorage) {
-        chrome.storage.local.set({ [STORAGE_MD_KEY]: text });
-      } else {
-        localStorage.setItem(STORAGE_MD_KEY, text);
+  const readText = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(file);
+    });
+
+  await Promise.all(
+    companionFiles.map(async (file) => {
+      try {
+        const text = await readText(file);
+        companionAssets.set(file.name.toLowerCase(), text);
+      } catch (err) {
+        console.error("Failed to read companion file:", file.name, err);
       }
-    } else if (isHtml) {
-      switchMode("html");
-      editorInput.value = text;
-      if (hasChromeStorage) {
-        chrome.storage.local.set({ [STORAGE_HTML_KEY]: text });
-      } else {
-        localStorage.setItem(STORAGE_HTML_KEY, text);
-      }
+    })
+  );
+
+  const mainName = mainFile.name.toLowerCase();
+  const isMarkdown = mainName.endsWith(".md") || mainName.endsWith(".markdown");
+  const targetMode = isMarkdown ? "markdown" : "html";
+  const targetStorageKey = isMarkdown ? STORAGE_MD_KEY : STORAGE_HTML_KEY;
+
+  try {
+    const text = await readText(mainFile);
+    switchMode(targetMode, text);
+    editorInput.value = text;
+    if (hasChromeStorage) {
+      chrome.storage.local.set({ [targetStorageKey]: text });
+    } else {
+      localStorage.setItem(targetStorageKey, text);
     }
-    
     renderPreview();
-  };
-  reader.readAsText(file);
+  } catch (err) {
+    console.error("Failed to read main file:", mainFile.name, err);
+  }
 });
 
 editorInput.addEventListener("input", () => {
